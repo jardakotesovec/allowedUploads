@@ -17,10 +17,9 @@
 namespace APP\plugins\generic\allowedUploads;
 
 use APP\core\Application;
-use APP\template\TemplateManager;
-use PKP\core\JSONMessage;
+use PKP\core\APIRouter;
 use PKP\linkAction\LinkAction;
-use PKP\linkAction\request\AjaxModal;
+use PKP\linkAction\request\VueModal;
 use PKP\plugins\GenericPlugin;
 use PKP\plugins\Hook;
 
@@ -38,10 +37,15 @@ class AllowedUploadsPlugin extends GenericPlugin
             return true;
         }
         if ($success && $this->getEnabled($mainContextId)) {
-
-			Hook::add('SubmissionFile::validate', $this->checkUploadWizard(...));			
+			Hook::add('SubmissionFile::validate', $this->checkUploadWizard(...));
 			Hook::add('submissionfilesuploadform::validate', $this->checkUpload(...));
 
+            Hook::add('APIHandler::endpoints::plugin', function (string $hookName, APIRouter $apiRouter): bool {
+                $apiRouter->registerPluginApiControllers([
+                    new AllowedUploadsController(),
+                ]);
+                return Hook::CONTINUE;
+            });
         }
         return $success;
 	}
@@ -67,48 +71,35 @@ class AllowedUploadsPlugin extends GenericPlugin
 	 */
 	public function getActions($request, $verb)
 	{
-		$router = $request->getRouter();
+		$context = $request->getContext();
+
+		$apiUrl = $request->getDispatcher()->url(
+			$request,
+			Application::ROUTE_API,
+			$context->getPath(),
+			'plugin/allowedUploads'
+		);
+
+		$form = new AllowedUploadsForm($apiUrl);
+
 		return array_merge(
-			$this->getEnabled()?array(
+			$this->getEnabled() ? [
 				new LinkAction(
 					'settings',
-					new AjaxModal(
-						$router->url($request, null, null, 'manage', null, array('verb' => 'settings', 'plugin' => $this->getName(), 'category' => 'generic')),
-						$this->getDisplayName()
+					new VueModal(
+						'PkpFormModal',
+						[
+							'title' => $this->getDisplayName(),
+							'formConfig' => $form->getConfig(),
+							'getApiUrl' => $apiUrl,
+						]
 					),
 					__('manager.plugins.settings'),
 					null
 				),
-			):array(),
+			] : [],
 			parent::getActions($request, $verb)
 		);
-	}
-
- 	/**
-	 * @copydoc Plugin::manage()
-	 */
-	public function manage($args, $request)
-	{
-		switch ($request->getUserVar('verb')) {
-			case 'settings':
-				$context = $request->getContext();
-				$templateMgr = TemplateManager::getManager($request);
-                $templateMgr->registerPlugin('function', 'plugin_url', $this->smartyPluginUrl(...));
-
-				$form = new AllowedUploadsSettingsForm($this, $context->getId());
-
-				if ($request->getUserVar('save')) {
-					$form->readInputData();
-					if ($form->validate()) {
-						$form->execute();
-						return new JSONMessage(true);
-					}
-				} else {
-					$form->initData();
-				}
-				return new JSONMessage(true, $form->fetch($request));
-		}
-		return parent::manage($args, $request);
 	}
 
 	/**
