@@ -1,66 +1,73 @@
 <?php
 
 /**
- * @file plugins/generic/allowedUploads/AllowedUploadsPlugin.inc.php
+ * @file plugins/generic/allowedUploads/AllowedUploadsPlugin.php
  *
- * Copyright (c) 2014-2022 Simon Fraser University
- * Copyright (c) 2003-2022 John Willinsky
+ * Copyright (c) 2014-2026 Simon Fraser University
+ * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class AllowedUploadsPlugin
+ * 
  * @ingroup plugins_generic_allowedUploads
  *
  * @brief Allowed Uploads plugin class
  */
 
+namespace APP\plugins\generic\allowedUploads;
+
 use APP\core\Application;
 use APP\template\TemplateManager;
 use PKP\core\JSONMessage;
+use PKP\linkAction\LinkAction;
+use PKP\linkAction\request\AjaxModal;
 use PKP\plugins\GenericPlugin;
-use PKP\plugins\PluginRegistry;
-use PKP\validation\ValidatorFactory;
+use PKP\plugins\Hook;
 
+class AllowedUploadsPlugin extends GenericPlugin
+{
+    /**
+     * @copydoc Plugin::register()
+     *
+     * @param null|mixed $mainContextId
+     */
+	public function register($category, $path, $mainContextId = null)
+	{
+        $success = parent::register($category, $path, $mainContextId);
+        if (Application::isUnderMaintenance()) {
+            return true;
+        }
+        if ($success && $this->getEnabled($mainContextId)) {
 
-class AllowedUploadsPlugin extends GenericPlugin {
-	/**
-	 * Called as a plugin is registered to the registry
-	 * @param $category String Name of category plugin was registered to
-	 * @return boolean True iff plugin initialized successfully; if false,
-	 * 	the plugin will not be registered.
-	 */
-	function register($category, $path, $mainContextId = null) {
-		$success = parent::register($category, $path);
-		if (!Config::getVar('general', 'installed') || defined('RUNNING_UPGRADE')) return true;
-		if ($success && $this->getEnabled()) {
+			Hook::add('SubmissionFile::validate', $this->checkUploadWizard(...));			
+			Hook::add('submissionfilesuploadform::validate', $this->checkUpload(...));
 
-			HookRegistry::register('SubmissionFile::validate', array($this, 'checkUploadWizard'));
-			HookRegistry::register('submissionfilesuploadform::validate', array($this, 'checkUpload'));
-		}
-		return $success;
+        }
+        return $success;
 	}
 
-	/**
-	 * Get the plugin display name.
-	 * @return string
-	 */
-	function getDisplayName() {
+    /**
+     * @copydoc Plugin::getDisplayName()
+     */
+	public function getDisplayName()
+	{
 		return __('plugins.generic.allowedUploads.displayName');
 	}
 
-	/**
-	 * Get the plugin description.
-	 * @return string
-	 */
-	function getDescription() {
+    /**
+     * @copydoc Plugin::getDescription()
+     */
+	public function getDescription()
+	{
 		return __('plugins.generic.allowedUploads.description');
 	}
 
 	/**
 	 * @copydoc Plugin::getActions()
 	 */
-	function getActions($request, $verb) {
+	public function getActions($request, $verb)
+	{
 		$router = $request->getRouter();
-		import('lib.pkp.classes.linkAction.request.AjaxModal');
 		return array_merge(
 			$this->getEnabled()?array(
 				new LinkAction(
@@ -80,15 +87,14 @@ class AllowedUploadsPlugin extends GenericPlugin {
  	/**
 	 * @copydoc Plugin::manage()
 	 */
-	function manage($args, $request) {
+	public function manage($args, $request)
+	{
 		switch ($request->getUserVar('verb')) {
 			case 'settings':
 				$context = $request->getContext();
-
 				$templateMgr = TemplateManager::getManager($request);
-				$templateMgr->registerPlugin('function', 'plugin_url', array($this, 'smartyPluginUrl'));
+                $templateMgr->registerPlugin('function', 'plugin_url', $this->smartyPluginUrl(...));
 
-				$this->import('AllowedUploadsSettingsForm');
 				$form = new AllowedUploadsSettingsForm($this, $context->getId());
 
 				if ($request->getUserVar('save')) {
@@ -106,9 +112,13 @@ class AllowedUploadsPlugin extends GenericPlugin {
 	}
 
 	/**
-	 * Check the uploaded file in wizard
-	 */
-	function checkUploadWizard($hookName, $params) {
+     * Check the uploaded file in wizard
+     *
+     * @param string $hookName
+     * @param array $params
+     */
+	public function checkUploadWizard($hookName, $params)
+	{
 		$props = $params[2];
 		$locale = $params[4];
 
@@ -134,9 +144,13 @@ class AllowedUploadsPlugin extends GenericPlugin {
 	}
 
 	/**
-	 * Check the uploaded file
-	 */
-	function checkUpload($hookName, $params) {
+     * Check the uploaded file
+     *
+     * @param string $hookName
+     * @param array $params
+     */	
+	public function checkUpload($hookName, $params)
+	{
 		$form = $params[0];
 		$request = Application::get()->getRequest();
 		$context = $request->getContext();
@@ -158,7 +172,8 @@ class AllowedUploadsPlugin extends GenericPlugin {
 		}
 		return false;
 	}
-
-
 }
-?>
+
+if (!PKP_STRICT_MODE) {
+    class_alias('\APP\plugins\generic\allowedUploads\AllowedUploadsPlugin', '\AllowedUploadsPlugin');
+}
