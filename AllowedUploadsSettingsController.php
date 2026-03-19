@@ -1,9 +1,9 @@
 <?php
 
 /**
- * @file plugins/generic/allowedUploads/AllowedUploadsController.php
+ * @file plugins/generic/allowedUploads/AllowedUploadsSettingsController.php
  *
- * @class AllowedUploadsController
+ * @class AllowedUploadsSettingsController
  *
  * @brief API controller for AllowedUploads plugin settings
  */
@@ -16,25 +16,31 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 use PKP\core\PKPBaseController;
-use PKP\plugins\PluginRegistry;
 use PKP\security\Role;
 
-class AllowedUploadsController extends PKPBaseController
+class AllowedUploadsSettingsController extends PKPBaseController
 {
+    public function __construct(
+        private AllowedUploadsPlugin $plugin
+    ) {}
+
     public function getHandlerPath(): string
     {
-        return 'plugin/allowedUploads';
+        return 'plugins/' . $this->plugin->getName() . '/settings';
     }
 
     public function getRouteGroupMiddleware(): array
     {
+        $roles = [Role::ROLE_ID_SITE_ADMIN];
+
+        if (!$this->plugin->isSitePlugin()) {
+            $roles[] = Role::ROLE_ID_MANAGER;
+        }
+
         return [
             'has.user',
             'has.context',
-            self::roleAuthorizer([
-                Role::ROLE_ID_SITE_ADMIN,
-                Role::ROLE_ID_MANAGER,
-            ]),
+            self::roleAuthorizer($roles),
         ];
     }
 
@@ -46,22 +52,20 @@ class AllowedUploadsController extends PKPBaseController
 
     public function get(Request $illuminateRequest): JsonResponse
     {
-        $plugin = $this->getPlugin();
         $contextId = $this->getRequest()->getContext()->getId();
 
         return response()->json(
-            ['allowedExtensions' => $plugin->getSetting($contextId, 'allowedExtensions') ?? ''],
+            ['allowedExtensions' => $this->plugin->getSetting($contextId, 'allowedExtensions') ?? ''],
             Response::HTTP_OK
         );
     }
 
     public function edit(EditAllowedUploadsSettings $illuminateRequest): JsonResponse
     {
-        $plugin = $this->getPlugin();
         $contextId = $this->getRequest()->getContext()->getId();
         $allowedExtensions = $illuminateRequest->validated()['allowedExtensions'];
 
-        $plugin->updateSetting($contextId, 'allowedExtensions', $allowedExtensions);
+        $this->plugin->updateSetting($contextId, 'allowedExtensions', $allowedExtensions);
 
         return response()->json(
             ['allowedExtensions' => $allowedExtensions],
@@ -69,8 +73,4 @@ class AllowedUploadsController extends PKPBaseController
         );
     }
 
-    private function getPlugin(): AllowedUploadsPlugin
-    {
-        return PluginRegistry::getPlugin('generic', 'alloweduploadsplugin');
-    }
 }

@@ -25,6 +25,8 @@ use PKP\plugins\Hook;
 
 class AllowedUploadsPlugin extends GenericPlugin
 {
+    private AllowedUploadsSettingsController $controller;
+
     /**
      * @copydoc Plugin::register()
      *
@@ -40,9 +42,11 @@ class AllowedUploadsPlugin extends GenericPlugin
 			Hook::add('SubmissionFile::validate', $this->checkUploadWizard(...));
 			Hook::add('submissionfilesuploadform::validate', $this->checkUpload(...));
 
+            $this->controller = new AllowedUploadsSettingsController($this);
+
             Hook::add('APIHandler::endpoints::plugin', function (string $hookName, APIRouter $apiRouter): bool {
                 $apiRouter->registerPluginApiControllers([
-                    new AllowedUploadsController(),
+                    $this->controller,
                 ]);
                 return Hook::CONTINUE;
             });
@@ -77,7 +81,7 @@ class AllowedUploadsPlugin extends GenericPlugin
 			$request,
 			Application::ROUTE_API,
 			$context->getPath(),
-			'plugin/allowedUploads'
+			$this->controller->getHandlerPath()
 		);
 
 		$form = new AllowedUploadsForm($apiUrl);
