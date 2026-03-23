@@ -14,41 +14,10 @@ use APP\plugins\generic\allowedUploads\formRequests\EditAllowedUploadsSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Route;
-use PKP\core\PKPBaseController;
-use PKP\security\Role;
+use PKP\plugins\PluginSettingsController;
 
-class AllowedUploadsSettingsController extends PKPBaseController
+class AllowedUploadsSettingsController extends PluginSettingsController
 {
-    public function __construct(
-        private AllowedUploadsPlugin $plugin
-    ) {}
-
-    public function getHandlerPath(): string
-    {
-        return 'plugins/' . $this->plugin->getName() . '/settings';
-    }
-
-    public function getRouteGroupMiddleware(): array
-    {
-        $roles = [Role::ROLE_ID_SITE_ADMIN];
-
-        if (!$this->plugin->isSitePlugin()) {
-            $roles[] = Role::ROLE_ID_MANAGER;
-        }
-
-        return [
-            'has.user',
-            'has.context',
-            self::roleAuthorizer($roles),
-        ];
-    }
-
-    public function getGroupRoutes(): void
-    {
-        Route::get('', $this->get(...))->name('plugin.allowedUploads.get');
-        Route::put('', $this->edit(...))->name('plugin.allowedUploads.edit');
-    }
 
     public function get(Request $illuminateRequest): JsonResponse
     {
