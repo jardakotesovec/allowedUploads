@@ -75,8 +75,13 @@ class AllowedUploadsPlugin extends GenericPlugin
 	 */
 	public function getActions($request, $verb)
 	{
-		$context = $request->getContext();
+		$actions = parent::getActions($request, $verb);
 
+		if (!$this->getEnabled()) {
+			return $actions;
+		}
+
+		$context = $request->getContext();
 		$apiUrl = $request->getDispatcher()->url(
 			$request,
 			Application::ROUTE_API,
@@ -86,24 +91,21 @@ class AllowedUploadsPlugin extends GenericPlugin
 
 		$form = new AllowedUploadsForm($apiUrl);
 
-		return array_merge(
-			$this->getEnabled() ? [
-				new LinkAction(
-					'settings',
-					new VueModal(
-						'PkpFormModal',
-						[
-							'title' => $this->getDisplayName(),
-							'formConfig' => $form->getConfig(),
-							'getApiUrl' => $apiUrl,
-						]
-					),
-					__('manager.plugins.settings'),
-					null
-				),
-			] : [],
-			parent::getActions($request, $verb)
-		);
+		array_unshift($actions, new LinkAction(
+			'settings',
+			new VueModal(
+				'PkpFormModal',
+				[
+					'title' => $this->getDisplayName(),
+					'formConfig' => $form->getConfig(),
+					'getApiUrl' => $apiUrl,
+				]
+			),
+			__('manager.plugins.settings'),
+			null
+		));
+
+		return $actions;
 	}
 
 	/**
